@@ -20,9 +20,6 @@ use utils::*;
 mod is_zero;
 use is_zero::*;
 
-// to do: add checker if green = 0, then diff is not zero
-// (1 - green) * is_zero(diff) = 0
-// same for yellow
 
 // This helper checks that the value witnessed in a given cell is within a a lookup dictionary table.
 
@@ -362,9 +359,9 @@ mod tests {
 
     #[test]
     fn test_range_check_2() {
-        let k = 9;
+        let k = 16;
 
-        let words = [String::from("abcde"), String::from("aaaaa"), String::from("zoras")];
+        let words = [String::from("audio"), String::from("hunky"), String::from("fluff")];
         
         let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into())];
         let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
@@ -377,7 +374,7 @@ mod tests {
             }
         }
 
-        let final_word = String::from("edcba");
+        let final_word = String::from("fluff");
         let final_chars = word_to_chars(&final_word);
 
         let mut word_diffs_green = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];

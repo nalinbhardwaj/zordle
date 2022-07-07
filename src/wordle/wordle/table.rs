@@ -51,7 +51,7 @@ impl<F: FieldExt> RangeTableConfig<F> {
     }
 
     pub(super) fn load(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
-        let mut words = read_words_from_file("src/wordle/wordle/foo.json").unwrap().into_iter().map(|word| {
+        let mut words = read_words_from_file("src/wordle/wordle/dict.json").unwrap().into_iter().map(|word| {
             word_to_polyhash(&word)
         }).collect::<Vec<_>>();
         words.push(0);
