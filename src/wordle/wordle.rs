@@ -38,8 +38,7 @@ pub struct WordCheckConfig<F: FieldExt> {
     q_color: Selector,
     poly_word: Column<Advice>,
     chars: [Column<Advice>; WORD_LEN],
-    green_is_zero_advice_column: [Column<Advice>; WORD_LEN],
-    yellow_is_zero_advice_column: [Column<Advice>; WORD_LEN],
+    color_is_zero_advice_column: [Column<Advice>; WORD_LEN],
     final_word_chars_instance: Column<Instance>,
     char_green_instance: Column<Instance>,
     char_yellow_instance: Column<Instance>,
@@ -71,8 +70,7 @@ impl<F: FieldExt>
         q_color: Selector,
         poly_word: Column<Advice>,
         chars: [Column<Advice>; WORD_LEN],
-        green_is_zero_advice_column: [Column<Advice>; WORD_LEN],
-        yellow_is_zero_advice_column: [Column<Advice>; WORD_LEN],
+        color_is_zero_advice_column: [Column<Advice>; WORD_LEN],
         final_word_chars_instance: Column<Instance>,
         char_green_instance: Column<Instance>,
         char_yellow_instance: Column<Instance>,
@@ -86,14 +84,14 @@ impl<F: FieldExt>
                 meta,
                 |meta| meta.query_selector(q_diff_green_is_zero),
                 |meta| meta.query_advice(chars[i], Rotation(-2)),
-                green_is_zero_advice_column[i],
+                color_is_zero_advice_column[i],
             ));
 
             diffs_yellow_is_zero.push(IsZeroChip::configure(
                 meta,
                 |meta| meta.query_selector(q_diff_yellow_is_zero),
                 |meta| meta.query_advice(chars[i], Rotation(-2)),
-                yellow_is_zero_advice_column[i],
+                color_is_zero_advice_column[i],
             ));
         }
 
@@ -218,8 +216,7 @@ impl<F: FieldExt>
             q_color,
             poly_word,
             chars,
-            green_is_zero_advice_column,
-            yellow_is_zero_advice_column,
+            color_is_zero_advice_column,
             final_word_chars_instance,
             char_green_instance,
             char_yellow_instance,
@@ -338,14 +335,7 @@ impl<F: FieldExt> Circuit<F> for WordleCircuit<F>
             meta.advice_column(),
             meta.advice_column()            
         ];
-        let green_is_zero_advice_column = [
-            meta.advice_column(),
-            meta.advice_column(),
-            meta.advice_column(),
-            meta.advice_column(),
-            meta.advice_column()
-        ];
-        let yellow_is_zero_advice_column = [
+        let color_is_zero_advice_column = [
             meta.advice_column(),
             meta.advice_column(),
             meta.advice_column(),
@@ -366,8 +356,7 @@ impl<F: FieldExt> Circuit<F> for WordleCircuit<F>
             q_color,
             poly_word,
             chars,
-            green_is_zero_advice_column,
-            yellow_is_zero_advice_column,
+            color_is_zero_advice_column,
             final_word_chars_instance,
             char_green_instance,
             char_yellow_instance,
