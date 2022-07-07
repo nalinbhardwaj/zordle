@@ -17,6 +17,9 @@ use table::*;
 mod utils;
 use utils::*;
 
+mod is_zero;
+use is_zero::*;
+
 // to do: add checker if green = 0, then diff is not zero
 // (1 - green) * is_zero(diff) = 0
 // same for yellow
@@ -36,9 +39,13 @@ struct RangeCheckConfig<F: FieldExt> {
     final_word_chars_instance: [Column<Instance>; WORD_LEN],
     char_green: [Column<Advice>; WORD_LEN],
     char_green_instance: [Column<Instance>; WORD_LEN],
+    diffs_green: [Column<Advice>; WORD_LEN],
     char_yellow: [Column<Advice>; WORD_LEN],
     char_yellow_instance: [Column<Instance>; WORD_LEN],
+    diffs_yellow: [Column<Advice>; WORD_LEN],
     table: RangeTableConfig<F>,
+    diffs_green_is_zero: [IsZeroConfig<F>; WORD_LEN],
+    diffs_yellow_is_zero: [IsZeroConfig<F>; WORD_LEN],
 }
 
 impl<F: FieldExt>
@@ -51,11 +58,33 @@ impl<F: FieldExt>
         final_word_chars_instance: [Column<Instance>; WORD_LEN],
         char_green: [Column<Advice>; WORD_LEN],
         char_green_instance: [Column<Instance>; WORD_LEN],
+        diffs_green: [Column<Advice>; WORD_LEN],
         char_yellow: [Column<Advice>; WORD_LEN],
         char_yellow_instance: [Column<Instance>; WORD_LEN],
+        diffs_yellow: [Column<Advice>; WORD_LEN],
     ) -> Self {
         let q_lookup = meta.complex_selector();
         let table = RangeTableConfig::configure(meta);
+
+        let mut diffs_green_is_zero = vec![];
+        let mut diffs_yellow_is_zero = vec![];
+        for i in 0..WORD_LEN {
+            let green_is_zero_advice_column = meta.advice_column();
+            diffs_green_is_zero.push(IsZeroChip::configure(
+                meta,
+                |meta| meta.query_selector(q_lookup),
+                |meta| meta.query_advice(diffs_green[i], Rotation::cur()),
+                green_is_zero_advice_column,
+            ));
+
+            let yellow_is_zero_advice_column = meta.advice_column();
+            diffs_yellow_is_zero.push(IsZeroChip::configure(
+                meta,
+                |meta| meta.query_selector(q_lookup),
+                |meta| meta.query_advice(diffs_yellow[i], Rotation::cur()),
+                yellow_is_zero_advice_column,
+            ));
+        }
 
         for i in 0..WORD_LEN {
             meta.enable_equality(chars[i]);
@@ -88,7 +117,7 @@ impl<F: FieldExt>
             [q * (hash_check - poly_word)]
         });
 
-        meta.create_gate("color check", |meta| {
+        meta.create_gate("color check",|meta | {
             let q = meta.query_selector(q_lookup);
             
             let mut constraints = Vec::new();
@@ -96,20 +125,45 @@ impl<F: FieldExt>
                 let char = meta.query_advice(chars[idx], Rotation::cur());
                 let final_char = meta.query_advice(final_word_chars[idx], Rotation::cur());
                 let green = meta.query_advice(char_green[idx], Rotation::cur());
+                let diff_green = meta.query_advice(diffs_green[idx], Rotation::cur());
                 constraints.push(q.clone() * (char.clone() - final_char.clone()) * green.clone());
+                constraints.push(q.clone() * diffs_green_is_zero[idx].expr() * (Expression::Constant(F::one()) - green.clone()));
+                constraints.push(q.clone() * ((char.clone() - final_char.clone()) - diff_green.clone()));
             }
 
             for idx in 0..WORD_LEN {
                 let char = meta.query_advice(chars[idx], Rotation::cur());
                 let yellow = meta.query_advice(char_yellow[idx], Rotation::cur());
+                let diff_yellow = meta.query_advice(diffs_yellow[idx], Rotation::cur());
 
                 let yellow_check = {
-                    (0..WORD_LEN).fold(Expression::Constant(F::from(1)), |expr, i| {
+                    (0..WORD_LEN).fold(Expression::Constant(F::one()), |expr, i| {
                         let final_char = meta.query_advice(final_word_chars[i], Rotation::cur());
                         expr * (char.clone() - final_char)
                     })
                 };
                 constraints.push(q.clone() * yellow_check.clone() * yellow.clone());
+                constraints.push(q.clone() * diffs_yellow_is_zero[idx].expr() * (Expression::Constant(F::one()) - yellow.clone()));
+                constraints.push(q.clone() * (yellow_check.clone() - diff_yellow.clone()));
+            }
+
+            constraints
+        });
+
+        meta.create_gate("character range check", |meta| {
+            let q = meta.query_selector(q_lookup);
+            let mut constraints = vec![];
+            for idx in 0..WORD_LEN {
+                let value = meta.query_advice(chars[idx], Rotation::cur());
+
+                let range_check = |range: usize, value: Expression<F>| {
+                    assert!(range > 0);
+                    (1..range).fold(value.clone(), |expr, i| {
+                        expr * (Expression::Constant(F::from(i as u64)) - value.clone())
+                    })
+                };
+
+                constraints.push(q.clone() * range_check(28, value.clone()));
             }
 
             constraints
@@ -123,9 +177,13 @@ impl<F: FieldExt>
             final_word_chars_instance,
             char_green,
             char_green_instance,
+            diffs_green,
             char_yellow,
             char_yellow_instance,
             table,
+            diffs_yellow,
+            diffs_green_is_zero: diffs_green_is_zero.try_into().unwrap(),
+            diffs_yellow_is_zero: diffs_yellow_is_zero.try_into().unwrap(),
         }
     }
 
@@ -134,8 +192,17 @@ impl<F: FieldExt>
         mut layouter: impl Layouter<F>,
         poly_word: Value<Assigned<F>>,
         chars: [Value<Assigned<F>>; WORD_LEN],
+        diffs_green: [Value<F>; WORD_LEN],
+        diffs_yellow: [Value<F>; WORD_LEN],
         instance_offset: usize,
     ) -> Result<(), Error> {
+        let mut diffs_green_is_zero_chips = vec![];
+        let mut diffs_yellow_is_zero_chips = vec![];
+        for i in 0..WORD_LEN {
+            diffs_green_is_zero_chips.push(IsZeroChip::construct(self.diffs_green_is_zero[i].clone()));
+            diffs_yellow_is_zero_chips.push(IsZeroChip::construct(self.diffs_yellow_is_zero[i].clone()));
+        }
+
         layouter.assign_region(
             || "Assign value for lookup dictionary check",
             |mut region| {
@@ -151,6 +218,11 @@ impl<F: FieldExt>
                 
                 for i in 0..WORD_LEN {
                     region.assign_advice(|| "characters", self.chars[i], offset, || chars[i])?;
+                    region.assign_advice(|| "characters", self.diffs_green[i], offset, || diffs_green[i])?;
+                    region.assign_advice(|| "characters", self.diffs_yellow[i], offset, || diffs_yellow[i])?;
+                    diffs_green_is_zero_chips[i].assign(&mut region, 0, diffs_green[i])?;
+                    diffs_yellow_is_zero_chips[i].assign(&mut region, 0, diffs_yellow[i])?;
+
                     region.assign_advice_from_instance(|| "final word characters",
                     self.final_word_chars_instance[i], 0, self.final_word_chars[i], offset)?;
                     region.assign_advice_from_instance(|| "color green chars",
@@ -170,6 +242,8 @@ impl<F: FieldExt>
 struct MyCircuit<F: FieldExt> {
     poly_words: [Value<Assigned<F>>; WORD_COUNT],
     word_chars: [[Value<Assigned<F>>; WORD_LEN]; WORD_COUNT],
+    word_diffs_green: [[Value<F>; WORD_LEN]; WORD_COUNT],
+    word_diffs_yellow: [[Value<F>; WORD_LEN]; WORD_COUNT],
 }
 
 impl<F: FieldExt> Circuit<F> for MyCircuit<F>
@@ -232,6 +306,20 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F>
             meta.instance_column(),
             meta.instance_column()            
         ];
+        let diffs_green = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column()            
+        ];
+        let diffs_yellow = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column()            
+        ];
         RangeCheckConfig::configure(meta,
             poly_word,
             chars,
@@ -239,8 +327,10 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F>
             final_word_chars_instance,
             char_green,
             char_green_instance,
+            diffs_green,
             char_yellow,
-            char_yellow_instance
+            char_yellow_instance,
+            diffs_yellow
         )
     }
 
@@ -256,6 +346,8 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F>
                 layouter.namespace(|| format!("word {}", idx)),
                 self.poly_words[idx],
                 self.word_chars[idx],
+                self.word_diffs_green[idx],
+                self.word_diffs_yellow[idx],
                 idx,
             )?;
         }
@@ -272,9 +364,9 @@ mod tests {
     fn test_range_check_2() {
         let k = 9;
 
-        let words = [String::from("abcde"), String::from("aaaaa")];
+        let words = [String::from("abcde"), String::from("aaaaa"), String::from("zoras")];
         
-        let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into())];
+        let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into())];
         let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
 
         for idx in 0..WORD_COUNT {
@@ -285,16 +377,40 @@ mod tests {
             }
         }
 
+        let final_word = String::from("edcba");
+        let final_chars = word_to_chars(&final_word);
+
+        let mut word_diffs_green = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
+        let mut word_diffs_yellow = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
+        for idx in 0..WORD_COUNT {
+            let chars = word_to_chars(&words[idx].clone());
+            for i in 0..WORD_LEN {
+                word_diffs_green[idx][i] = Value::known((Fp::from(chars[i]) - Fp::from(final_chars[i])).into());
+            }
+
+            for i in 0..WORD_LEN {
+                let yellow_diff = {
+                    (0..WORD_LEN).fold(Fp::from(1), |expr, j| {
+                        expr * (Fp::from(chars[i]) - Fp::from(final_chars[j]))
+                    })
+                };
+                word_diffs_yellow[idx][i] = Value::known(Fp::from(yellow_diff).into());
+            }
+        }
+
+        println!("word_diffs_green {:?}", word_diffs_green);
+        println!("{:?}", word_diffs_yellow);
+
         // Successful cases
         let circuit = MyCircuit::<Fp> {
             poly_words,
             word_chars,
+            word_diffs_green,
+            word_diffs_yellow,
         };
 
         let mut instance = Vec::new();
 
-        let final_word = String::from("edcba");
-        let final_chars = word_to_chars(&final_word);
         // final word chars
         for i in 0..WORD_LEN {
             instance.push(vec![Fp::from(final_chars[i])]);

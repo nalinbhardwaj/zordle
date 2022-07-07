@@ -13,12 +13,14 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use super::utils::*;
+
 #[derive(Serialize, Deserialize)]
 struct Dict {
-    words: Vec<u64>,
+    words: Vec<String>,
 }
 
-fn read_words_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<u64>, Box<dyn StdError>> {
+fn read_words_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<String>, Box<dyn StdError>> {
     // Open the file in read-only mode with buffer.
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -49,7 +51,10 @@ impl<F: FieldExt> RangeTableConfig<F> {
     }
 
     pub(super) fn load(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
-        let words = read_words_from_file("src/wordle/wordle/foo.json").unwrap();
+        let mut words = read_words_from_file("src/wordle/wordle/foo.json").unwrap().into_iter().map(|word| {
+            word_to_polyhash(&word)
+        }).collect::<Vec<_>>();
+        words.push(0);
 
         layouter.assign_table(
             || "load dictionary-check table",

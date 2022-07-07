@@ -1,7 +1,7 @@
 use halo2_proofs::pasta::Fp;
 
 pub const BASE: u64 = 29;
-pub const WORD_COUNT: usize = 2;
+pub const WORD_COUNT: usize = 3;
 pub const WORD_LEN : usize = 5;
 
 pub fn word_to_chars(word: &str) -> Vec<u64> {
