@@ -514,6 +514,7 @@ version = "0.1.0"
 dependencies = [
  "halo2_proofs",
  "plotters",
+ "rand_core",
  "serde",
  "serde_json",
  "tabbycat",

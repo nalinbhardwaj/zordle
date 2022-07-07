@@ -35,12 +35,12 @@ fn read_words_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<String>, Box<dyn 
 
 /// A lookup table of values from dictionary.
 #[derive(Debug, Clone)]
-pub(super) struct RangeTableConfig<F: FieldExt> {
+pub(super) struct DictTableConfig<F: FieldExt> {
     pub(super) value: TableColumn,
     _marker: PhantomData<F>,
 }
 
-impl<F: FieldExt> RangeTableConfig<F> {
+impl<F: FieldExt> DictTableConfig<F> {
     pub(super) fn configure(meta: &mut ConstraintSystem<F>) -> Self {
         let value = meta.lookup_table_column();
 

@@ -1,1 +1,1 @@
-mod wordle;
+pub mod wordle;

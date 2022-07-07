@@ -14,7 +14,7 @@ use halo2_proofs::{
 mod table;
 use table::*;
 
-mod utils;
+pub mod utils;
 use utils::*;
 
 mod is_zero;
@@ -28,7 +28,7 @@ use is_zero::*;
 struct RangeConstrained<F: FieldExt>(AssignedCell<Assigned<F>, F>);
 
 #[derive(Debug, Clone)]
-struct RangeCheckConfig<F: FieldExt> {
+pub struct WordCheckConfig<F: FieldExt> {
     q_input: Selector,
     q_diff_g: Selector,
     q_diff_y: Selector,
@@ -43,7 +43,7 @@ struct RangeCheckConfig<F: FieldExt> {
     final_word_chars_instance: Column<Instance>,
     char_green_instance: Column<Instance>,
     char_yellow_instance: Column<Instance>,
-    table: RangeTableConfig<F>,
+    table: DictTableConfig<F>,
     diffs_green_is_zero: [IsZeroConfig<F>; WORD_LEN],
     diffs_yellow_is_zero: [IsZeroConfig<F>; WORD_LEN],
 }
@@ -59,7 +59,7 @@ struct RangeCheckConfig<F: FieldExt> {
 // yellow
 
 impl<F: FieldExt>
-    RangeCheckConfig<F>
+    WordCheckConfig<F>
 {
     pub fn configure(meta: &mut ConstraintSystem<F>,
         q_input: Selector,
@@ -77,7 +77,7 @@ impl<F: FieldExt>
         char_green_instance: Column<Instance>,
         char_yellow_instance: Column<Instance>,
     ) -> Self {
-        let table = RangeTableConfig::configure(meta);
+        let table = DictTableConfig::configure(meta);
 
         let mut diffs_green_is_zero = vec![];
         let mut diffs_yellow_is_zero = vec![];
@@ -229,7 +229,7 @@ impl<F: FieldExt>
         }
     }
 
-    pub fn assign_lookup(
+    pub fn assign_word(
         &self,
         mut layouter: impl Layouter<F>,
         poly_word: Value<Assigned<F>>,
@@ -304,17 +304,17 @@ impl<F: FieldExt>
 }
 
 
-#[derive(Default)]
-struct MyCircuit<F: FieldExt> {
-    poly_words: [Value<Assigned<F>>; WORD_COUNT],
-    word_chars: [[Value<Assigned<F>>; WORD_LEN]; WORD_COUNT],
-    word_diffs_green: [[Value<F>; WORD_LEN]; WORD_COUNT],
-    word_diffs_yellow: [[Value<F>; WORD_LEN]; WORD_COUNT],
+#[derive(Default, Clone)]
+pub struct WordleCircuit<F: FieldExt> {
+    pub poly_words: [Value<Assigned<F>>; WORD_COUNT],
+    pub word_chars: [[Value<Assigned<F>>; WORD_LEN]; WORD_COUNT],
+    pub word_diffs_green: [[Value<F>; WORD_LEN]; WORD_COUNT],
+    pub word_diffs_yellow: [[Value<F>; WORD_LEN]; WORD_COUNT],
 }
 
-impl<F: FieldExt> Circuit<F> for MyCircuit<F>
+impl<F: FieldExt> Circuit<F> for WordleCircuit<F>
 {
-    type Config = RangeCheckConfig<F>;
+    type Config = WordCheckConfig<F>;
     type FloorPlanner = V1;
 
     fn without_witnesses(&self) -> Self {
@@ -356,7 +356,7 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F>
         let char_green_instance = meta.instance_column();
         let char_yellow_instance = meta.instance_column();
 
-        RangeCheckConfig::configure(meta,
+        WordCheckConfig::configure(meta,
             q_input,
             q_diff_g,
             q_diff_y,
@@ -383,7 +383,7 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F>
 
         for idx in 0..WORD_COUNT {
             // println!("idx {:?} diffs_green: {:?}", idx, self.word_diffs_green[idx]);
-            config.assign_lookup(
+            config.assign_word(
                 layouter.namespace(|| format!("word {}", idx)),
                 self.poly_words[idx],
                 self.word_chars[idx],
@@ -402,7 +402,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_range_check_2() {
+    fn test_wordle_1() {
         let k = 15;
 
         let words = [String::from("audio"), String::from("hunky"), String::from("funky"), String::from("fluff")];
@@ -443,7 +443,7 @@ mod tests {
         // println!("{:?}", word_diffs_yellow);
 
         // Successful cases
-        let circuit = MyCircuit::<Fp> {
+        let circuit = WordleCircuit::<Fp> {
             poly_words,
             word_chars,
             word_diffs_green,
@@ -491,7 +491,7 @@ mod tests {
 
     #[cfg(feature = "dev-graph")]
     #[test]
-    fn print_range_check_2() {
+    fn print_wordle() {
         use plotters::prelude::*;
 
         let root = BitMapBackend::new("range-check-2-layout.png", (1024, 3096)).into_drawing_area();
@@ -500,7 +500,7 @@ mod tests {
             .titled("Range Check 2 Layout", ("sans-serif", 60))
             .unwrap();
 
-        let circuit = MyCircuit::<Fp, 8, 256> {
+        let circuit = WordleCircuit::<Fp, 8, 256> {
             value: Value::unknown(),
             lookup_value: Value::unknown(),
         };
