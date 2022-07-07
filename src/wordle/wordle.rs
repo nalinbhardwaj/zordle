@@ -392,11 +392,11 @@ mod tests {
 
     #[test]
     fn test_wordle_1() {
-        let k = 15;
+        let k = 14;
 
-        let words = [String::from("audio"), String::from("hunky"), String::from("funky"), String::from("fluff")];
+        let words = [String::from("audio"), String::from("hunky"), String::from("funky"), String::from("fluff"), String::from("fluff"), String::from("fluff")];
         
-        let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into())];
+        let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()); WORD_COUNT];
         let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
 
         for idx in 0..WORD_COUNT {

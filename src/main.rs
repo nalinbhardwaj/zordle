@@ -8,18 +8,118 @@ use halo2_proofs::plonk::{
 use halo2_proofs::poly::{commitment::Params};
 use halo2_proofs::pasta::{Eq, EqAffine};
 use rand_core::OsRng;
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::{self, Write, Read};
 
 mod wordle;
 use crate::wordle::wordle::{*, utils::*};
 
-fn main() {
-    println!("Hello, world!");
-    let k = 15;
+const K: u32 = 14;
 
-    let words = [String::from("audio"), String::from("hunky"), String::from("funky"), String::from("fluff")];
-    
-    let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into()), Value::known(Fp::from(123).into())];
+fn interpret_diff(diff: Vec<Vec<Fp>>) {
+    let mut diff_str = String::new();
+    for i in 0..5 {
+        if diff[0][i] == Fp::one() {
+            diff_str.push('🟩');
+        } else if diff[1][i] == Fp::one() {
+            diff_str.push('🟨');
+        } else {
+            diff_str.push('🟥');
+        }
+    }
+    println!("{}", diff_str);
+}
+
+fn verify_play(final_word: String) {
+
+    let final_chars = word_to_chars(&final_word);
+
+    let empty_circuit = WordleCircuit::<Fp> {
+        poly_words: [Value::unknown(); WORD_COUNT],
+        word_chars: [[Value::unknown(); WORD_LEN]; WORD_COUNT],
+        word_diffs_green: [[Value::unknown(); WORD_LEN]; WORD_COUNT],
+        word_diffs_yellow: [[Value::unknown(); WORD_LEN]; WORD_COUNT],
+    };
+
+
+    let mut instance = Vec::new();
+
+    // final word chars
+    let mut final_chars_instance = vec![];
+    for i in 0..WORD_LEN {
+        final_chars_instance.push(Fp::from(final_chars[i]));
+    }
+    instance.push(final_chars_instance.clone());
+
+    // read json file to array
+    let mut file = File::open("diffs_json.txt").unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    let diff_json: Vec<Vec<Vec<u64>>> = serde_json::from_str(&contents).unwrap();
+    let mut diffs = vec![];
+
+    for idx in 0..WORD_COUNT {
+        let mut diff_instance = vec![];
+        for i in 0..2 {
+            let mut col_row = vec![];
+            for j in 0..WORD_LEN {
+                col_row.push(Fp::from(diff_json[idx][i][j]));
+            }
+            diff_instance.push(col_row);
+        }
+        diffs.push(diff_instance.clone());
+        interpret_diff(diff_instance);
+    }
+
+    // color green
+    let mut green = vec![];
+    for idx in 0..WORD_COUNT {
+        for i in 0..WORD_LEN {
+            green.push(diffs[idx][0][i]);
+        }
+    }
+    instance.push(green.clone());
+
+    // color yellow
+    let mut yellow = vec![];
+    for idx in 0..WORD_COUNT {
+        for i in 0..WORD_LEN {
+            yellow.push(diffs[idx][1][i]);
+        }
+    }
+    instance.push(yellow.clone());
+
+    let mut instance_slice = [
+        &final_chars_instance.clone()[..],
+        &green.clone()[..],
+        &yellow.clone()[..],
+    ];
+
+    let params: Params<EqAffine> = Params::new(K);
+
+    let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
+
+
+    // Check that a hardcoded proof is satisfied
+    let proof = include_bytes!("proof.bin");
+    let strategy = SingleVerifier::new(&params);
+    let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
+    let result = verify_proof(
+        &params,
+        &vk,
+        strategy,
+        &[&instance_slice, &instance_slice],
+        &mut transcript,
+    );
+    if result.is_ok() {
+        println!("Proof OK!");
+    } else {
+        println!("Proof not OK!");
+    }
+}
+
+fn prove_play(words: [String; WORD_COUNT], final_word: String) {    
+    let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()); WORD_COUNT];
     let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
 
     for idx in 0..WORD_COUNT {
@@ -30,7 +130,6 @@ fn main() {
         }
     }
 
-    let final_word = String::from("fluff");
     let final_chars = word_to_chars(&final_word);
 
     let mut word_diffs_green = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
@@ -50,9 +149,6 @@ fn main() {
             word_diffs_yellow[idx][i] = Value::known(Fp::from(yellow_diff).into());
         }
     }
-
-    // println!("word_diffs_green {:?}", word_diffs_green);
-    // println!("{:?}", word_diffs_yellow);
 
     let circuit = WordleCircuit::<Fp> {
         poly_words,
@@ -82,6 +178,15 @@ fn main() {
         diffs.push(compute_diff(&words[idx], &final_word));
     }
 
+    let mut diffs_u64 = vec![];
+    for idx in 0..WORD_COUNT {
+        diffs_u64.push(compute_diff_u64(&words[idx], &final_word));
+    }
+
+    let diffs_json_str = serde_json::to_string(&diffs_u64).unwrap();
+    let mut diffs_json_file = File::create("diffs_json.txt").unwrap();
+    diffs_json_file.write_all(diffs_json_str.as_bytes()).unwrap();
+
     // color green
     let mut green = vec![];
     for idx in 0..WORD_COUNT {
@@ -106,39 +211,94 @@ fn main() {
         &yellow.clone()[..],
     ];
 
-    let params: Params<EqAffine> = Params::new(k);
+    println!("Successfully generated witness");
+
+    let params: Params<EqAffine> = Params::new(K);
 
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-    let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+    let pk = keygen_pk(&params, vk.clone(), &empty_circuit).expect("keygen_pk should not fail");
+    println!("Successfully generated proving key");
 
-    // let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
-    // // Create a proof
-    // create_proof(
-    //     &params,
-    //     &pk,
-    //     &[circuit.clone(), circuit.clone()],
-    //     &[&instance_slice, &instance_slice],
-    //     OsRng,
-    //     &mut transcript,
-    // )
-    // .expect("proof generation should not fail");
-    // let proof: Vec<u8> = transcript.finalize();
+    let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+    // Create a proof
+    create_proof(
+        &params,
+        &pk,
+        &[circuit.clone(), circuit.clone()],
+        &[&instance_slice, &instance_slice],
+        OsRng,
+        &mut transcript,
+    )
+    .expect("proof generation should not fail");
+    let proof: Vec<u8> = transcript.finalize();
 
-    // std::fs::write("proof.bin", &proof[..])
-    //     .expect("should succeed to write new proof");
+    std::fs::write("src/proof.bin", &proof[..])
+        .expect("should succeed to write new proof");
 
-    // io::stdout().write_all(&proof);
+    println!("Successfully wrote proof to proof.bin");
+
+    println!("Verifying proof for final word {}", final_word);
+    println!("Share Sheet:");
+    for i in 0..WORD_COUNT {
+        interpret_diff(diffs[i].clone());
+    }
 
     // Check that a hardcoded proof is satisfied
-    let proof = include_bytes!("proof.bin");
+    // let proof = include_bytes!("proof.bin");
     let strategy = SingleVerifier::new(&params);
     let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-    assert!(verify_proof(
+    let result = verify_proof(
         &params,
-        pk.get_vk(),
+        &vk,
         strategy,
         &[&instance_slice, &instance_slice],
         &mut transcript,
-    )
-    .is_ok());
+    );
+    if result.is_ok() {
+        println!("Proof OK!");
+    } else {
+        println!("Proof not OK!");
+    }
+}
+
+fn play(final_word: String) {
+
+    let mut running = true;
+    let mut counter = 0;
+    let mut words = vec![];
+    while running && counter < WORD_COUNT {
+        println!("Enter a word:");
+        let mut word = String::new();
+        io::stdin().read_line(&mut word).unwrap();
+        word = word.trim().to_string();
+        assert!(word.len() == 5);
+        words.push(word.clone());
+
+        let diff = compute_diff(&words[counter], &final_word);
+        interpret_diff(diff);
+
+        if word == final_word {
+            running = false;
+        }
+        counter += 1;
+    }
+
+    while counter < 6 {
+        words.push(final_word.clone());
+        counter += 1;
+    }
+
+    if !running {
+        println!("You win! Generating ZK proof...");
+        prove_play(words.try_into().unwrap(), final_word);
+    } else {
+        println!("You lose!");
+    }
+    
+}
+
+fn main() {
+    let final_word = "fluff".to_string();
+    println!("Welcome to zk wordle!");
+    play(final_word);
 }
