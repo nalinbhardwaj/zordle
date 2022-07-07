@@ -1,7 +1,7 @@
 use halo2_proofs::pasta::Fp;
 
 pub const BASE: u64 = 29;
-pub const WORD_COUNT: usize = 3;
+pub const WORD_COUNT: usize = 4;
 pub const WORD_LEN : usize = 5;
 
 pub fn word_to_chars(word: &str) -> Vec<u64> {
@@ -44,6 +44,7 @@ pub fn compute_diff(word: &str, final_word: &str) -> Vec<Vec<Fp>> {
         }
     }
     res.push(yellow);
+    // println!("word {:?} final {:?} res {:?}", word, final_word, res);
     
     res
 }
