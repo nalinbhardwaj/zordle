@@ -9,7 +9,7 @@ use halo2_proofs::poly::{commitment::Params};
 use halo2_proofs::pasta::{Eq, EqAffine};
 use rand_core::OsRng;
 use std::fs::File;
-use std::io::{self, Write, Read};
+use std::io::{self, Write, Read, BufReader};
 
 mod wordle;
 use crate::wordle::wordle::{*, utils::*};
@@ -52,7 +52,7 @@ fn verify_play(final_word: String) {
     instance.push(final_chars_instance.clone());
 
     // read json file to array
-    let mut file = File::open("diffs_json.txt").unwrap();
+    let mut file = File::open("diffs_json.bin").unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     let diff_json: Vec<Vec<Vec<u64>>> = serde_json::from_str(&contents).unwrap();
@@ -68,7 +68,12 @@ fn verify_play(final_word: String) {
             diff_instance.push(col_row);
         }
         diffs.push(diff_instance.clone());
-        interpret_diff(diff_instance);
+    }
+
+    println!("Verifying proof for final word {}", final_word);
+    println!("Share Sheet:");
+    for i in 0..WORD_COUNT {
+        interpret_diff(diffs[i].clone());
     }
 
     // color green
@@ -95,13 +100,13 @@ fn verify_play(final_word: String) {
         &yellow.clone()[..],
     ];
 
-    let params: Params<EqAffine> = Params::new(K);
+    let params_fs = File::open("params.bin").unwrap();
+    let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
 
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
 
-
     // Check that a hardcoded proof is satisfied
-    let proof = include_bytes!("proof.bin");
+    let proof = include_bytes!("../proof.bin");
     let strategy = SingleVerifier::new(&params);
     let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
     let result = verify_proof(
@@ -184,7 +189,7 @@ fn prove_play(words: [String; WORD_COUNT], final_word: String) {
     }
 
     let diffs_json_str = serde_json::to_string(&diffs_u64).unwrap();
-    let mut diffs_json_file = File::create("diffs_json.txt").unwrap();
+    let mut diffs_json_file = File::create("diffs_json.bin").unwrap();
     diffs_json_file.write_all(diffs_json_str.as_bytes()).unwrap();
 
     // color green
@@ -213,7 +218,8 @@ fn prove_play(words: [String; WORD_COUNT], final_word: String) {
 
     println!("Successfully generated witness");
 
-    let params: Params<EqAffine> = Params::new(K);
+    let params_fs = File::open("params.bin").unwrap();
+    let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
 
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk.clone(), &empty_circuit).expect("keygen_pk should not fail");
@@ -232,7 +238,7 @@ fn prove_play(words: [String; WORD_COUNT], final_word: String) {
     .expect("proof generation should not fail");
     let proof: Vec<u8> = transcript.finalize();
 
-    std::fs::write("src/proof.bin", &proof[..])
+    std::fs::write("proof.bin", &proof[..])
         .expect("should succeed to write new proof");
 
     println!("Successfully wrote proof to proof.bin");
@@ -259,6 +265,12 @@ fn prove_play(words: [String; WORD_COUNT], final_word: String) {
     } else {
         println!("Proof not OK!");
     }
+}
+
+fn write_params() {
+    let mut params_file = File::create("params.bin").unwrap();
+    let params: Params<EqAffine> = Params::new(K);
+    params.write(&mut params_file).unwrap();
 }
 
 fn play(final_word: String) {
@@ -300,5 +312,17 @@ fn play(final_word: String) {
 fn main() {
     let final_word = "fluff".to_string();
     println!("Welcome to zk wordle!");
-    play(final_word);
+    println!("Enter play to play the game, verify to check a proof, or write to generate a new params file");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    input = input.trim().to_string();
+    if input == "play" {
+        play(final_word);
+    } else if input == "verify" {
+        verify_play(final_word);
+    } else if input == "write" {
+        write_params();
+    } else {
+        println!("Invalid input");
+    }
 }
