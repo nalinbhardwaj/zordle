@@ -9,7 +9,7 @@ use halo2_proofs::poly::{commitment::Params};
 use halo2_proofs::pasta::{Eq, EqAffine};
 use rand_core::OsRng;
 use std::fs::File;
-use std::io::{self, Write, Read, BufReader};
+use std::io::{self, Write, Read, BufReader, BufWriter};
 
 mod wordle;
 use crate::wordle::wordle::{*, utils::*};

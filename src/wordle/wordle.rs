@@ -483,16 +483,57 @@ mod tests {
     fn print_wordle() {
         use plotters::prelude::*;
 
-        let root = BitMapBackend::new("range-check-2-layout.png", (1024, 3096)).into_drawing_area();
+        let root = BitMapBackend::new("wordle-layout.png", (1024, 3096)).into_drawing_area();
         root.fill(&WHITE).unwrap();
         let root = root
-            .titled("Range Check 2 Layout", ("sans-serif", 60))
+            .titled("Wordle Layout", ("sans-serif", 60))
             .unwrap();
 
-        let circuit = WordleCircuit::<Fp, 8, 256> {
-            value: Value::unknown(),
-            lookup_value: Value::unknown(),
+        let words = [String::from("audio"), String::from("hunky"), String::from("funky"), String::from("fluff"), String::from("fluff"), String::from("fluff")];
+    
+        let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()); WORD_COUNT];
+        let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
+
+        for idx in 0..WORD_COUNT {
+            poly_words[idx] = Value::known(Fp::from(word_to_polyhash(&words[idx].clone())).into());
+            let chars = word_to_chars(&words[idx].clone());
+            for i in 0..WORD_LEN {
+                word_chars[idx][i] = Value::known(Fp::from(chars[i]).into());
+            }
+        }
+
+        let final_word = String::from("fluff");
+        let final_chars = word_to_chars(&final_word);
+
+        let mut word_diffs_green = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
+        let mut word_diffs_yellow = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
+        for idx in 0..WORD_COUNT {
+            let chars = word_to_chars(&words[idx].clone());
+            for i in 0..WORD_LEN {
+                word_diffs_green[idx][i] = Value::known((Fp::from(chars[i]) - Fp::from(final_chars[i])).into());
+            }
+
+            for i in 0..WORD_LEN {
+                let yellow_diff = {
+                    (0..WORD_LEN).fold(Fp::from(1), |expr, j| {
+                        expr * (Fp::from(chars[i]) - Fp::from(final_chars[j]))
+                    })
+                };
+                word_diffs_yellow[idx][i] = Value::known(Fp::from(yellow_diff).into());
+            }
+        }
+
+        // println!("word_diffs_green {:?}", word_diffs_green);
+        // println!("{:?}", word_diffs_yellow);
+
+        // Successful cases
+        let circuit = WordleCircuit::<Fp> {
+            poly_words,
+            word_chars,
+            word_diffs_green,
+            word_diffs_yellow,
         };
+        
         halo2_proofs::dev::CircuitLayout::default()
             .render(9, &circuit, &root)
             .unwrap();
