@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import init, { initThreadPool, get_play_diff } from 'halowordle';
+import { wrap } from 'comlink';
 
 function App() {
+  const worker = new Worker(new URL('./test-worker', import.meta.url), {
+    name: 'my-worker',
+    type: 'module',
+  });
+  const workerApi = wrap<import('./test-worker').MyFirstWorker>(worker);
   const [ans, setAns] = useState(0);
-  useEffect(() => {
-    test();
-  }, [])
 
   async function test() {
-    console.log('here');
-    await init();
-    await initThreadPool(navigator.hardwareConcurrency);
-    const play_diff = await get_play_diff("fluff", ["audio", "audio", "audio", "audio", "audio", "audio"]);
-    setAns(play_diff);
+    const ret2 = await workerApi.get_play_diff();
+    console.log('in between', ret2);
+    // const params = await workerApi.write_params();
+    // console.log('outside params', params);
+    const proof = await workerApi.prove_play();
+    console.log('outside proof', proof);
   }
 
   return (
@@ -25,6 +28,7 @@ function App() {
           Edit <code>src/App.tsx</code> and save to reload.
         </p>
         {ans}
+        <button onClick={test}>test</button>
         <a
           className="App-link"
           href="https://reactjs.org"

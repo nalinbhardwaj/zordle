@@ -527,6 +527,7 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom",
  "halo2_proofs",
+ "js-sys",
  "plotters",
  "rand_core",
  "rayon",
@@ -535,6 +536,7 @@ dependencies = [
  "tabbycat",
  "wasm-bindgen",
  "wasm-bindgen-rayon",
+ "web-sys",
 ]
 
 [[package]]

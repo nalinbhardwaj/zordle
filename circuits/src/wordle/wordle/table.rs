@@ -14,24 +14,12 @@ use std::io::BufReader;
 use std::path::Path;
 
 use super::utils::*;
+use super::dict::*;
 
 #[derive(Serialize, Deserialize)]
 struct Dict {
     words: Vec<String>,
 }
-
-fn read_words_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<String>, Box<dyn StdError>> {
-    // Open the file in read-only mode with buffer.
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-
-    // Read the JSON contents of the file as an instance of `User`.
-    let u: Dict = serde_json::from_reader(reader)?;
-
-    // Return the `User`.
-    Ok(u.words)
-}
-
 
 /// A lookup table of values from dictionary.
 #[derive(Debug, Clone)]
@@ -51,9 +39,8 @@ impl<F: FieldExt> DictTableConfig<F> {
     }
 
     pub(super) fn load(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
-        let mut words = read_words_from_file("src/wordle/wordle/dict.json").unwrap().into_iter().map(|word| {
-            word_to_polyhash(&word)
-        }).collect::<Vec<_>>();
+        let mut words = get_dict();
+        // println!("words {:?}", words);
         words.push(0);
 
         layouter.assign_table(
@@ -65,7 +52,7 @@ impl<F: FieldExt> DictTableConfig<F> {
                         || "num_bits",
                         self.value,
                         offset,
-                        || Value::known(F::from(word.clone())),
+                        || Value::known(F::from(word.clone() as u64)),
                     )?;
                     offset += 1;
                 }

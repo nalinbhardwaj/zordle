@@ -17,6 +17,8 @@ use table::*;
 pub mod utils;
 use utils::*;
 
+pub mod dict;
+
 mod is_zero;
 use is_zero::*;
 

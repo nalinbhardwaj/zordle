@@ -11,6 +11,7 @@ use rand_core::OsRng;
 use std::fs::File;
 use std::io::{self, Write, Read, BufReader, BufWriter};
 use wasm_bindgen::prelude::*;
+use js_sys::Uint8Array;
 
 use crate::wordle::wordle::{*, utils::*};
 
@@ -18,12 +19,11 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 
 const K: u32 = 14;
 
+extern crate console_error_panic_hook;
+
 #[wasm_bindgen]
-pub fn write_params() -> JsValue {
-    let mut params_ser = Vec::new();
-    let params: Params<EqAffine> = Params::new(K);
-    params.write(&mut params_ser).unwrap();
-    JsValue::from_serde(&params_ser).unwrap()
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
 }
 
 #[wasm_bindgen]
@@ -126,9 +126,9 @@ pub fn get_play_diff(final_word: String, words_js: JsValue) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn prove_play(final_word: String, words_js: JsValue, params_ser: JsValue) -> JsValue {
-    let params_vec = params_ser.into_serde::<Vec<u8>>().unwrap();
+pub async fn prove_play(final_word: String, words_js: JsValue, params_ser: JsValue) -> JsValue {
     let mut words = words_js.into_serde::<Vec<String>>().unwrap();
+    let params_vec = Uint8Array::new(&params_ser).to_vec();
 
     let mut poly_words: [Value<Assigned<Fp>>; WORD_COUNT] = [Value::known(Fp::from(123).into()); WORD_COUNT];
     let mut word_chars: [[Value<Assigned<Fp>>; WORD_LEN]; WORD_COUNT] = [[Value::known(Fp::from(123).into()); WORD_LEN]; WORD_COUNT];
@@ -215,8 +215,8 @@ pub fn prove_play(final_word: String, words_js: JsValue, params_ser: JsValue) ->
 
     println!("Successfully generated witness");
 
-    // let params_fs = File::open("params.bin").unwrap();
-    // let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
+    // // let params_fs = File::open("params.bin").unwrap();
+    // // let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
     let params = Params::<EqAffine>::read(&mut BufReader::new(&params_vec[..])).unwrap();
 
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
@@ -235,6 +235,6 @@ pub fn prove_play(final_word: String, words_js: JsValue, params_ser: JsValue) ->
     )
     .expect("proof generation should not fail");
     let proof: Vec<u8> = transcript.finalize();
-
+    // let proof = [1 as u8]; // delete
     JsValue::from_serde(&proof).unwrap()
 }

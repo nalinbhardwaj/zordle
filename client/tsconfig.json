@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "es5",
     "lib": [
+      "webworker",
       "dom",
       "dom.iterable",
       "esnext"
@@ -22,5 +23,5 @@
   },
   "include": [
     "src"
-  ]
+, "public/worker.js"  ]
 }

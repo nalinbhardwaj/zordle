@@ -218,8 +218,12 @@ fn prove_play(words: [String; WORD_COUNT], final_word: String) {
 
     println!("Successfully generated witness");
 
-    let params_fs = File::open("params.bin").unwrap();
-    let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
+    let params_vec = std::fs::read(&"params.bin".to_string()).expect("good");
+    // println!("vec {:?}", params_vec);
+
+    // let params_fs = File::open("params.bin").unwrap();
+    // let params = Params::<EqAffine>::read(&mut BufReader::new(params_fs)).unwrap();
+    let params = Params::<EqAffine>::read(&mut BufReader::new(&params_vec[..])).unwrap();
 
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk.clone(), &empty_circuit).expect("keygen_pk should not fail");
