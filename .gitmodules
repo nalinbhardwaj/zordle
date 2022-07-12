@@ -1,0 +1,3 @@
+[submodule "react-wordle"]
+	path = react-wordle
+	url = https://github.com/nalinbhardwaj/react-wordle.git
