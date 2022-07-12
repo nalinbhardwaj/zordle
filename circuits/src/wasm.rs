@@ -28,7 +28,7 @@ pub fn init_panic_hook() {
 
 #[wasm_bindgen]
 pub fn verify_play(final_word: String, proof_js: JsValue, diffs_u64_js: JsValue, params_ser: JsValue) -> bool {
-    let params_vec = params_ser.into_serde::<Vec<u8>>().unwrap();
+    let params_vec = Uint8Array::new(&params_ser).to_vec();
     let proof = proof_js.into_serde::<Vec<u8>>().unwrap();
     let diffs_u64 = diffs_u64_js.into_serde::<[[[u64; WORD_LEN]; 2]; WORD_COUNT]>().unwrap();
 
