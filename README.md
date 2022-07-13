@@ -101,7 +101,7 @@ Let's ignore the yellow color boxes for now and just try to lay the intermediate
 
 ![image](https://user-images.githubusercontent.com/6984346/178804579-436cf1ca-c4c3-488f-8743-95ad4cd93473.png)
 
-Consider the witness trace of this circuit: We start with the guess (the first row) and the final solution (the second row) and go through a few intermediate computations to obtain the expected value of green boxes. `diff_green`, the third row, is the difference between the letters at the corresponding slots of the solution and the guess (for instance, slot 2, "U" - "L" = 9). Next, to do the two aforementioned green checks, we need to know 
+Consider the witness trace of this circuit: We start with the guess (the first row) and the final solution (the second row) and go through a few intermediate computations to obtain the expected value of green boxes. `diff_green`, the third row, is the difference between the letters at the corresponding slots of the solution and the guess (for instance, slot 2, "U" - "L" = 9). Next, to do the two aforementioned green checks, we need to additionally know "is `diff_green` zero?". This'll live in the next row, and finally we'll have a copy of the output green grid boxes from the instance in the last row to compare with our expected value. Finally, we'll add another column to our spreadsheet that'll just contain the hash of the letters of the guess. This is so we can check the lookup table for the guesses' validation with with a single lookup.
 
 Now that we have a high level intuition for what our circuit should "do", let's figure out how to actually _code_ this with Halo 2.
 
@@ -113,8 +113,19 @@ The Halo 2 library splits this circuit programming into a 2 pass structure: in t
 
 While I've already mentioned some details of the idea of regions before, a lot of the Halo 2 library is the wrapping of these regions into tight APIs that reduce programmer overhead. Besides regions that act as locality constructions in the spreadsheet, another accompanying concept introduced by the Halo 2 API is that of **rotation**. Imagine that you are *processing* the spreadsheet row by row, top to bottom. The rotation is just a way to express a row relative to the current row. So the current row is the current "rotation" in this sequential process, the row just above is the "-1" (or "previous") rotation and so on and so forth.
 
+Now, let's pick off of our circuit design in the previous section and use the Halo 2 library to codify it:
 
+First, let's make a list of constraints/checks we'll want to add to the spreadsheet:
 
+- The first row (containing the guess) should be an english word (this'll take a lookup check) and we should additionally constrain that the hash of the guess matches the letters in the other columns.
+- The second row has no checks
+- The third row should check the difference of the corresponding spot on the first two rows matches the difference expressed at this row.
+- The fourth row should check that the spots take value 1 only if the row above is zero. This is a rather complicated check - the Halo 2 API allows for a weak abstraction known as a "chip" that allows you to compose smaller subchecks a bit more easily. A chip is really just a fancy word for a "sub" circuit setting up its own gates and witness assignment and being "callable" from a larger circuit.
+- Finally the final row simply needs to check if this spot is 1, the third row must be 0 or if it is 0, the fourth row must be 1.
+
+Now, instantiation and filling in the witness is simply a matter of inputting values according to the mentioned rules.
+
+Ultimately, we have a clean 5 row, 7 column region that asserts everything necessary for one guess. We just repeat 6 of these for each of the possible user guesses to obtain our entire circuit!
 
 Some other miscellanous notes/thoughts about the Halo 2 API I couldn't fit elsewhere:
 
@@ -131,5 +142,6 @@ Some other miscellanous notes/thoughts about the Halo 2 API I couldn't fit elsew
 
 # WASM Port
 
+Halo 2 is written in Rust and currently only used by Zcash in their daemon software that runs on metal. As application developers, however, we wanted our circuits to prove and verify in web apps. Pulling together a WASM port of Halo 2 proving and verification was quite non-trivial. Original, my project was a CLI-based Wordle and basing on [Uma](https://twitter.com/pumatheuma)'s work on running Halo 2 prover and verifier in-browser, I ported the JS prototype to a React/TS friendly library and further discovered a number of speedup and memory utilisation tricks to make the Wordle circuit work in browser in a reasonable time frame. These tricks include [Blaine](https://twitter.com/BlaineBublitz)'s discovery of esoteric flags required to [bump up available memory for a Rust ported WebAssembly worker from a random GitHub issue](https://github.com/rustwasm/wasm-bindgen/issues/2498#issuecomment-801494135) and precomputing params and serving them as static files to the Rust WASM. All of these tricks are rolled into a [small test-client](https://github.com/nalinbhardwaj/zordle/tree/main/test-client) that might be helpful to future Halo WASM porters. :)
 
-
+Feel free to hit me up if you have thoughts on any of the notes in this README, many of these are half-baked thoughts and ideas I'd like to flesh out :))
