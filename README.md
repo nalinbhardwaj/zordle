@@ -57,7 +57,7 @@ While cost-modelling seems to be quite problematic for circuit writers on the su
 
 [^2]: Supposedly, this will also mark the switching point where we can stop bothering with a hyper-optimised zkEVM and instead just write a zkMIPS for any VM. More notes on this tradeoff [here](https://kelvinfichter.com/pages/thoughts/hybrid-rollups/).
 
-It's certainly fun to theorise about the future, but right now, we have a very real task at hand: making an anti-cheat for a meaningless word game that's not even popular any more. And the only way to write these circuits is delve into the weeds and think deeply about the spreadsheet and its regions and what-not as a "low-level" programmer.
+It's certainly fun to theorise about the future, but right now, we have a very real task at hand: making an anti-cheat that doesn't really work for a meaningless word game that's not even popular any more. And the only way to write these circuits is delve into the weeds and think deeply about the spreadsheet and its regions and what-not as a "low-level" programmer.
 
 The initial observation I had about Wordle's structure is that every guess is quite independent of the others - if a guess is valid on its own, its always valid inside a game and vice-versa. This made me think that the right structure is to make an individual region for each guess.
 
