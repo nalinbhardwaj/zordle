@@ -97,13 +97,13 @@ This check is: for each slot of the grid, if the slot is _not_ green, compare th
 
 The check for yellow color work almost the same way: Instead of comparing the letters at the exact slot, the comparison is just replaced by a giant OR on all possible pairings of the guess letter with letters of the solution.
 
-Let's try to lay the intermediate variables out in one region of the spreadsheet:
+Let's ignore the yellow color boxes for now and just try to lay the intermediate variables out in one region of the spreadsheet, considering only the green boxes:
 
 ![image](https://user-images.githubusercontent.com/6984346/178804579-436cf1ca-c4c3-488f-8743-95ad4cd93473.png)
 
+Consider the witness trace of this circuit: We start with the guess (the first row) and the final solution (the second row) and go through a few intermediate computations to obtain the expected value of green boxes. `diff_green`, the third row, is the difference between the letters at the corresponding slots of the solution and the guess (for instance, slot 2, "U" - "L" = 9). Next, to do the two aforementioned green checks, we need to know 
 
-
-Now that we have some high level intuition for what our circuit should "do", let's figure out how to actually _code_ this with Halo 2.
+Now that we have a high level intuition for what our circuit should "do", let's figure out how to actually _code_ this with Halo 2.
 
 # API
 
@@ -119,6 +119,7 @@ While I've already mentioned some details of the idea of regions before, a lot o
 Some other miscellanous notes/thoughts about the Halo 2 API I couldn't fit elsewhere:
 
 - One quirk of the Halo 2 API is that while advice columns are referred to by offset rotations, the instance columns are referred to by absolute row numbers, which adds to some confusion. But this is mostly a function of these instance columns being entirely independent of the regions abstraction.
+- Note that the spreadsheet model of layouting is a very intentional choice of the Halo 2 Library. There are many other ways to model ZK circuits while still using them with PLONKish arithmetisation. For instance, Yi Sun/Jonathan Wang from the learning group used only a single column to write their circuit (the [halo2wrong](https://github.com/privacy-scaling-explorations/halo2wrong/blob/master/ecdsa/src/ecdsa.rs) repo does something similar) primarily to reduce verification cost and simplify cost-modelling. On the other hand, Circom developers are planning to stick to the R1CS-like circuit layout structure but just add the ability to define [custom gates](https://github.com/iden3/circom/pull/67) using PLONK. Ultimately, I personally think the generalised many-row many-column spreadsheet like structure is the most flexible representation amongst these, but there's definitely tradeoffs in ease-of-use vs powerfulness to be explored.
 - I love the detail and care put into debug info for the Halo 2 library. Coming from circom-land (where debugging detail is _quite_ lacking to say the least), Halo 2's debugging hand-holding was a breath of fresh air. :)) And I love the little parrot! 🦜
 
 <img width="411" alt="image" src="https://user-images.githubusercontent.com/6984346/178801659-fd532672-e03e-42e6-945f-4c1ac502da1b.png">
