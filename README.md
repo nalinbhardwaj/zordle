@@ -24,7 +24,7 @@ In Zordle, after solving the day's Wordle, a user additionally generates a ZK pr
 
 [^1]: Ignore the minor technical detail that they can always just cheat by looking up the day's word elsewhere. 😅
 
-Learning about the shiny new features of Halo 2, Wordle seemed like the perfect application to get my hands dirty with them, so I chose to work on this as my project! The rest of this README will be a technical note on the circuits and an informal introduction to the Halo 2 Library and features of PLONKish proving systems.
+Learning about the shiny new features of Halo 2, Wordle seemed like the perfect toy application to get my hands dirty with them, so I chose to work on this as my project! The rest of this README will be a technical note on the circuits and an informal introduction to the Halo 2 Library and features of PLONKish proving systems.
 
 # Circuit
 
