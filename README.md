@@ -80,6 +80,7 @@ With this one region per guess abstraction, let's think about what checks are ne
 - rotation is local in a global table
 - instance cols are global for no strong reason tbh
 - region is a locality construction
+- 2 pass structure, pass 1 for constraining, pass 2 for witness gen, and in the margin between the two passes lie all the soundness bugs.
 
 # WASM Port
 
