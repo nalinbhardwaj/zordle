@@ -4,11 +4,10 @@ Zordle is [Wordle](https://www.nytimes.com/games/wordle/index.html), but with ze
 
 This project was made as part of [0xPARC Halo 2 Learning Group](https://0xparc.org/blog/halo2-learning-group). Big shoutout to [Ying Tong](https://twitter.com/therealyingtong) for basically hand-holding me through Halo2 circuit writing and to [Uma](https://twitter.com/pumatheuma) and [Blaine](https://twitter.com/BlaineBublitz) for significant work on porting the Halo 2 library to WASM.
 
-# Demo
+# [✨Demo: Live at zordle.xyz ✨](https://zordle.xyz/)
 
-## [✨Live at zordle.xyz ✨](https://zordle.xyz/)
+https://user-images.githubusercontent.com/6984346/178832179-f9ae5ca5-e271-49b5-84ba-848fcd970b45.mov
 
-(insert video!)
 
 # Motivation and user flow
 
