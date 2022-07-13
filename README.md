@@ -97,16 +97,36 @@ This check is: for each slot of the grid, if the slot is _not_ green, compare th
 
 The check for yellow color work almost the same way: Instead of comparing the letters at the exact slot, the comparison is just replaced by a giant OR on all possible pairings of the guess letter with letters of the solution.
 
+Let's try to lay the intermediate variables out in one region of the spreadsheet:
+
+![image](https://user-images.githubusercontent.com/6984346/178804579-436cf1ca-c4c3-488f-8743-95ad4cd93473.png)
+
+
+
 Now that we have some high level intuition for what our circuit should "do", let's figure out how to actually _code_ this with Halo 2.
 
 # API
 
+Fundamentally, the Halo 2 API is a way to write functions (or formulas if you will) on the abstraction of the underlying spreadsheet data structure. Since we can't populate each cell and hand wire each constraint by hand, we need a programmatic layer to do this for us.
+
+The Halo 2 library splits this circuit programming into a 2 pass structure: in the first pass, you decide on and assign all the constraints and logical gates that each region/row/cell must abide by. The second pass is assignment/witness generation: you populate values into this spreadsheet and "instantiate" it.[^4]
+
+While I've already mentioned some details of the idea of regions before, a lot of the Halo 2 library is the wrapping of these regions into tight APIs that reduce programmer overhead. Besides regions that act as locality constructions in the spreadsheet, another accompanying concept introduced by the Halo 2 API is that of **rotation**. Imagine that you are *processing* the spreadsheet row by row, top to bottom. The rotation is just a way to express a row relative to the current row. So the current row is the current "rotation" in this sequential process, the row just above is the "-1" (or "previous") rotation and so on and so forth.
 
 
-- rotation is local in a global table
-- instance cols are global for no strong reason tbh
-- region is a locality construction
-- 2 pass structure, pass 1 for constraining, pass 2 for witness gen, and in the margin between the two passes lie all the soundness bugs.
+
+
+Some other miscellanous notes/thoughts about the Halo 2 API I couldn't fit elsewhere:
+
+- One quirk of the Halo 2 API is that while advice columns are referred to by offset rotations, the instance columns are referred to by absolute row numbers, which adds to some confusion. But this is mostly a function of these instance columns being entirely independent of the regions abstraction.
+- I love the detail and care put into debug info for the Halo 2 library. Coming from circom-land (where debugging detail is _quite_ lacking to say the least), Halo 2's debugging hand-holding was a breath of fresh air. :)) And I love the little parrot! 🦜
+
+<img width="411" alt="image" src="https://user-images.githubusercontent.com/6984346/178801659-fd532672-e03e-42e6-945f-4c1ac502da1b.png">
+
+
+
+[^4]: Sidenote that soundness/under-constraining bugs in this Halo 2 model essentially lie at the margin of the difference of these two passes. This is a useful fact to keep in mind as a circuit writer.
+
 
 # WASM Port
 
