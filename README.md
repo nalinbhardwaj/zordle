@@ -1,6 +1,6 @@
 # Zordle: ZK Wordle
 
-Zordle is [Wordle](https://www.nytimes.com/games/wordle/index.html), but with zero-knowledge proofs. Zordle uses ZK proofs to prove that someone knows words that map to a certain share, but does not reveal those words to a verifier. Zordle is probably the first end-to-end web app built using [Halo 2](https://github.com/zcash/halo2/) ZK proofs!
+Zordle is [Wordle](https://www.nytimes.com/games/wordle/index.html), but with zero-knowledge proofs. Zordle uses ZK proofs to prove that a player knows words that map to their shared grid, but does not reveal those words to a verifier. Zordle is probably the first end-to-end web app built using [Halo 2](https://github.com/zcash/halo2/) ZK proofs!
 
 This project was made as part of [0xPARC Halo 2 Learning Group](https://0xparc.org/blog/halo2-learning-group). Big shoutout to [Ying Tong](https://twitter.com/therealyingtong) for basically hand-holding me through Halo2 circuit writing and to [Uma](https://twitter.com/pumatheuma) and [Blaine](https://twitter.com/BlaineBublitz) for significant work on porting the Halo 2 library to WASM.
 
@@ -18,19 +18,19 @@ Earlier this year, Wordle became one of the most popular word games, with millio
 
 _At some point, my only form of communication with some of my friends was Wordle grid exchanges_
 
-However, the ease of sharing of these emoji boxes came with an unfortunate flaw: A player could just edit their grid after the fact and make themselves seem much smarter than they originally were. I was always suspicious if my friends really got the scores they claimed or not. ZK SNARKs to the rescue! 🤓
+However, the ease of sharing these emoji boxes came with an unfortunate flaw: A player could just edit their grid after the game and make themselves seem much smarter than they originally were. I was always suspicious if my friends _really_ got the scores they claimed or not. ZK SNARKs to the rescue! 🤓
 
 In Zordle, after solving the day's Wordle, a user additionally generates a ZK proof attesting that they know the set of words that perfectly correspond to a set of emoji boxes that they're sharing![^1]
 
 [^1]: Ignore the minor technical detail that they can always just cheat by looking up the day's word elsewhere. 😅
 
-Learning about the shiny new features of Halo 2, Wordle seemed like the perfect toy application to get my hands dirty with them, so I chose to work on this as my project! The rest of this README will be a technical note on the circuits and an informal introduction to the Halo 2 Library and features of PLONKish proving systems.
+Learning about the shiny new features of Halo 2, Wordle seemed like a cool toy application to get my hands dirty with the library, so I chose to work on this as my learning group project! The rest of this README will be a technical note on the circuits and an informal introduction to the Halo 2 Library and features of PLONKish proving systems.
 
 # Circuit
 
-The over-simplified mental model of Halo 2 I've come to appreciate is that of a giant spreadsheet: You have a cells in a tabular format you can fill values in, mutate them from cell to cell, and check that relationships and constraints you'd desire hold true. Additionally, you have access to some "global" structures that are more powerful than just plain cell relationship comparators: you can check row A is a permutation of row B for a very cheap cost, and its also very cheap to check set membership of the value of a particular cell in a giant list (as long as you can define said giant list at "compile time").
+The over-simplified mental model of Halo 2 I've come to appreciate is that of a giant spreadsheet: You have cells in a tabular format you can fill values in, mutate them from cell to cell, and check that relationships and constraints you'd desire hold true. Additionally, you have access to some "global" structures that are more powerful than just plain cell relationship comparators: you can check row A is a permutation of row B for a very cheap cost, and its also very cheap to check set membership of the value of a particular cell in a giant list (as long as you can define said giant list at "compile time").
 
-![image](https://user-images.githubusercontent.com/6984346/178658416-78fbd21d-8caf-4d55-97a5-7c0c19e5190c.png)
+<img width="1187" alt="Muse MuseBoard 2022-07-13 11 37 57" src="https://user-images.githubusercontent.com/6984346/178774262-4e87557c-e66d-4d90-b3bd-94100bcafc49.png">
 
 
 To be slightly more precise, Halo 2 essentially structures circuits as row-column operations: There are 4 primary types of columns:
@@ -48,16 +48,27 @@ For simpler schemes like Groth16 that are based on R1CS, circuit engineers have 
 
 The abstraction of a spreadsheet for PLONKish arithmetisation is quite powerful because it allows the library to lay out and pack the rows and columns of your circuit tighter automatically (and paves the way for an IR/automated circuit optimiser long term). While great for optimizations, unfortunately this ability to auto-pack comes at the expense of making the API more nuanced and the cost modeling of circuits even more non-trivial to an end circuit programmer.
 
-To elaborate on the _nuance_ of the API, Halo 2 defines the concept of a "region" inside the spreadsheet. A region is the minimal set of cells such that all constraints relating to any single one of them is contained entirely within this region. This is a mouthful, but in essence regions are the minimal building blocks of a circuit. Typically, non-ZK apps are written in disparate modules - a good analogy for this is perhaps the Clock app on your mobile phone: the app is structured coherently to a user (around "time") but if you think about it like a programmer, the timer tab has very little in common with the world clock tab. The same is true for ZK circuits, a Clock circuit might want to check both the world clock and the status of a timer, and the representation of each of these is its own "region" in the Clock circuit. A programmer will write both of them almost independently, and let the compiler figure out the best way to pack them into the spreadsheet.
+To elaborate on the _nuance_ of the API, Halo 2 defines the concept of a "region" inside the spreadsheet. A region is the minimal set of cells such that all constraints relating to any one of them is contained entirely within this region. This is a mouthful, but in essence regions are the minimal building blocks of a circuit. Typically, non-ZK apps are written in disparate modules - a good analogy for this is perhaps the Clock app on your mobile phone: the app is structured coherently to a user (around "time") but if you think about it like a programmer, the timer tab has very little in common with the world clock tab. The same is true for ZK circuits, a Clock circuit might want to check both the world clock and the status of a timer, and the representation of each of these is its own "region" in the Clock circuit. A programmer will write both of them almost independently, and let the compiler figure out the best way to "pack" them into the spreadsheet.
 
 ![image0](https://user-images.githubusercontent.com/6984346/178660515-0d5b74ae-a7e6-4973-b5f3-fb174e305991.jpg)
 _Coherency of "time" to a user, but incoherency of regions to a programmer_
 
-While cost-modelling seems to be quite problematic for circuit writers on the surface right now, the general read of participants in the Halo 2 Learning Group seems to be that these APIs give circuit writers enough breathing room to hyper-optimise computation for commonly used primitive circuits, and in future, these efficient primitives can be composed (perhaps inefficiently) into real apps by higher-level circuit writers. Perhaps eventually ZK circuits will get to a point where few low-level programmers will hyper-optimise a minimal instruction set, and the rest of us will just roll our circuits into compilers composing the instruction set.[^2]
+While cost-modelling seems to be quite problematic for circuit writers on the surface with the Halo 2 library set up right now, the general read of participants in the Halo 2 Learning Group seems to be that these APIs give circuit writers enough breathing room to hyper-optimise computation for commonly used primitive circuits, and in future, these efficient primitives can be composed (perhaps inefficiently) into real apps by higher-level circuit writers. Hopefully, eventually, ZK circuits will get to a point where few low-level programmers will hyper-optimise a minimal instruction set, and the rest of us will just roll our circuits into compilers composing and optimising circuits on those instruction sets.[^2]
 
-[^2]: Supposedly, this will also mark the switching point where we can stop bothering with a hyper-optimised zkEVM and instead just write a zkMIPS for any VM. More notes on this tradeoff [here](https://kelvinfichter.com/pages/thoughts/hybrid-rollups/).
+[^2]: Supposedly, this will also mark the switching point where we can stop bothering with a hyper-optimised zkEVMs and instead just write a zkMIPS machine for all VMs. More notes on this tradeoff [here](https://kelvinfichter.com/pages/thoughts/hybrid-rollups/).
 
-It's certainly fun to theorise about the future, but right now, we have a very real task at hand: making an anti-cheat that doesn't really work for a meaningless word game that's not even popular any more. And the only way to write these circuits is delve into the weeds and think deeply about the spreadsheet and its regions and what-not as a "low-level" programmer.
+It's certainly fun to theorise about the future of ZK circuit writing, but right now, we have a very real task at hand: making an anti-cheat that doesn't really work for a meaningless word game that's not even popular any more 🤡. And the only way to write these circuits is delve into the weeds and think deeply about the spreadsheet and its regions and what-not as a "low-level" programmer.
+
+First, let's quickly formalise our public/private inputs:
+
+### Public inputs
+
+- The solution word
+- The grid of boxes of 6 words x 5 slots (one for each letter): each cell in the grid is either green, yellow or grey
+
+### Private inputs
+
+- 6 words of 5 letters each
 
 The initial observation I had about Wordle's structure is that every guess is quite independent of the others - if a guess is valid on its own, its always valid inside a game and vice-versa. This made me think that the right structure is to make an individual region for each guess.
 
@@ -70,12 +81,27 @@ With this one region per guess abstraction, let's think about what checks are ne
 
 ### English word
 
-### Matching letter
+Typically, in a R1CS circuit, you would make the check for a guess being a dictionary word a Merkle proof. You would make a Merkle tree of all the words in the dictionary and witness the Merkle path of your guess in the tree[^3]. In PLONK/Halo 2 however, you have the added ability of lookup tables! While it's not particularly efficient to use lookup tables this way (since your circuit now has 12000+ rows), its a cool way to make use of the lookup table feature.
 
-### Not matching letter
+[^3]: Alternately, [you can tightly pack polynomial hashes of words in field elements 🥲](https://github.com/nalinbhardwaj/wordlines)
 
+### Green
+
+Precisely, this check is: for each slot of the grid, if the slot is green, compare the letters at that slot in the guess and the solution. They should be equal.
+
+### Not green
+
+This check is: for each slot of the grid, if the slot is _not_ green, compare the letters at that slot in the guess and the solution. They should _not_ be equal. In other words, the difference of the letters at that slot should be non-zero. We'll use this reformulation later.
+
+### Yellow and not yellow
+
+The check for yellow color work almost the same way: Instead of comparing the letters at the exact slot, the comparison is just replaced by a giant OR on all possible pairings of the guess letter with letters of the solution.
+
+Now that we have some high level intuition for what our circuit should "do", let's figure out how to actually _code_ this with Halo 2.
 
 # API
+
+
 
 - rotation is local in a global table
 - instance cols are global for no strong reason tbh
