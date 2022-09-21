@@ -104,7 +104,7 @@ pub fn verify_play(final_word: String, proof_js: JsValue, diffs_u64_js: JsValue,
         &params,
         &vk,
         strategy,
-        &[&instance_slice, &instance_slice],
+        &[&instance_slice],
         &mut transcript,
     ).is_ok()
 }
@@ -228,8 +228,8 @@ pub async fn prove_play(final_word: String, words_js: JsValue, params_ser: JsVal
     create_proof(
         &params,
         &pk,
-        &[circuit.clone(), circuit.clone()],
-        &[&instance_slice, &instance_slice],
+        &[circuit.clone()],
+        &[&instance_slice],
         OsRng,
         &mut transcript,
     )
