@@ -140,6 +140,8 @@ Some other miscellaneous notes/thoughts about the Halo 2 API I couldn't fit else
 
 # WASM Port
 
+**The [Halo 2 documentation now has a WASM Guide](https://zcash.github.io/halo2/user/wasm-port.html) based on Zordle.**
+
 Halo 2 is written in Rust and is currently only used by Zcash in their daemon software that runs on metal. As application developers, however, we wanted our circuits to prove and verify in web apps. Pulling together a WASM port of Halo 2 proving and verification was quite non-trivial. Original, my project was a CLI-based Wordle but based on [Uma](https://twitter.com/pumatheuma)'s work on running Halo 2 prover and verifier in-browser, we ported the JS prototype to a React/TS friendly library and further discovered some speedup and memory utilisation tricks to make the Wordle circuit work in browser in a reasonable time frame. These tricks include [Blaine](https://twitter.com/BlaineBublitz)'s discovery of esoteric flags required to [bump up available memory for a Rust ported WebAssembly worker from a random GitHub issue](https://github.com/rustwasm/wasm-bindgen/issues/2498#issuecomment-801494135) and precomputing params and serving them as static files to the Rust WASM. All of these tricks are rolled into a [small test-client](https://github.com/nalinbhardwaj/zordle/tree/main/test-client) that might be helpful to future Halo WASM porters. :)
 
 Feel free to hit me up if you have thoughts on any of the notes in this README, many of these are half-baked thoughts and ideas I'd like to flesh out :))
